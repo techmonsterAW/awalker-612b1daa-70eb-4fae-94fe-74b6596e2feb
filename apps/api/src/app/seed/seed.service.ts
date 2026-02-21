@@ -21,8 +21,17 @@ export class SeedService implements OnModuleInit {
   async onModuleInit() {
     if (process.env['SKIP_SEED'] === 'true') return;
     const count = await this.userRepo.count();
-    if (count > 0) return;
 
+    if (count === 0) {
+      await this.seedFull();
+      return;
+    }
+
+    await this.ensureViewerExists();
+  }
+
+  /** Creates Default Org, admin, welcome task, and viewer in same org (runs only when no users exist). */
+  private async seedFull(): Promise<void> {
     const org = this.orgRepo.create({ name: 'Default Org', parentId: null });
     await this.orgRepo.save(org);
 
@@ -46,15 +55,37 @@ export class SeedService implements OnModuleInit {
     });
     await this.taskRepo.save(task);
 
-    const org2 = this.orgRepo.create({ name: 'Other Org', parentId: null });
-    await this.orgRepo.save(org2);
     const hash2 = await bcrypt.hash('password123', 10);
     const user2 = this.userRepo.create({
       email: 'viewer@other.org',
       passwordHash: hash2,
-      organizationId: org2.id,
+      organizationId: org.id,
       role: Role.Viewer,
     });
     await this.userRepo.save(user2);
+  }
+
+  /** Ensures viewer@other.org exists in Default Org so they see the same tasks as the admin (read-only). */
+  private async ensureViewerExists(): Promise<void> {
+    const defaultOrg = await this.orgRepo.findOne({ where: { name: 'Default Org' } });
+    if (!defaultOrg) return;
+
+    let viewer = await this.userRepo.findOne({
+      where: { email: 'viewer@other.org' },
+    });
+
+    if (!viewer) {
+      const hash = await bcrypt.hash('password123', 10);
+      viewer = this.userRepo.create({
+        email: 'viewer@other.org',
+        passwordHash: hash,
+        organizationId: defaultOrg.id,
+        role: Role.Viewer,
+      });
+      await this.userRepo.save(viewer);
+    } else if (viewer.organizationId !== defaultOrg.id) {
+      viewer.organizationId = defaultOrg.id;
+      await this.userRepo.save(viewer);
+    }
   }
 }

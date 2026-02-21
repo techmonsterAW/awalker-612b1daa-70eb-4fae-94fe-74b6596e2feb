@@ -36,6 +36,15 @@
           "buildTarget": "dashboard:build:production"
         }
       }
+    },
+    "test": {
+      "executor": "@angular-devkit/build-angular:karma",
+      "options": {
+        "polyfills": ["zone.js", "zone.js/testing"],
+        "tsConfig": "apps/dashboard/tsconfig.spec.json",
+        "karmaConfig": "apps/dashboard/karma.conf.js"
+      },
+      "configurations": {}
     }
   },
   "tags": ["scope:dashboard"]

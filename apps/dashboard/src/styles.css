@@ -24,3 +24,49 @@
     background-size: 48px 48px;
   }
 }
+
+/* Drag-and-drop: stacking so cards don't hide each other and Edit/Delete stay clickable */
+.cdk-drag {
+  position: relative;
+  z-index: 1;
+}
+.cdk-drag-dragging {
+  z-index: 1000 !important;
+}
+.cdk-drag-placeholder {
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+.cdk-drag-placeholder * {
+  pointer-events: none !important;
+}
+/* Force pointer-events on so Edit/Delete work after drop; CDK can leave pointer-events: none on the list/drag items */
+.cdk-drag-drop-list .cdk-drag:not(.cdk-drag-dragging),
+.cdk-drag-drop-list .cdk-drag.cdk-drag-animating {
+  pointer-events: auto !important;
+}
+.cdk-drag-drop-list .cdk-drag:not(.cdk-drag-dragging) *,
+.cdk-drag-drop-list .cdk-drag.cdk-drag-animating * {
+  pointer-events: auto !important;
+}
+/* When list is not being dragged, ensure list and every item are clickable */
+.cdk-drag-drop-list:not(.cdk-drag-drop-list-dragging) {
+  pointer-events: auto !important;
+}
+.cdk-drag-drop-list:not(.cdk-drag-drop-list-dragging) .cdk-drag,
+.cdk-drag-drop-list:not(.cdk-drag-drop-list-dragging) .cdk-drag * {
+  pointer-events: auto !important;
+}
+/* Inner content wrapper: always receive pointer events so Edit/Delete work after drop even if CDK leaves the host with pointer-events: none */
+.cdk-drag .task-card-content,
+.cdk-drag .task-card-content * {
+  pointer-events: auto !important;
+}
+.cdk-drag-placeholder .task-card-content {
+  pointer-events: none !important;
+}
+
+/* Drop list: prevent layout jumps and keep list stable */
+.cdk-drag-drop-list-dragging .cdk-drag:not(.cdk-drag-dragging) {
+  transition: none;
+}

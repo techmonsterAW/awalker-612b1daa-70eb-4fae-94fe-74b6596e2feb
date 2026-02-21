@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc/apps/api",
+    "noEmit": true,
+    "paths": {
+      "@taskmgmt/data": ["../../libs/data/src/index.ts"],
+      "@taskmgmt/data/*": ["../../libs/data/src/*"]
+    }
+  },
+  "include": ["src/**/*.spec.ts", "src/**/*.e2e-spec.ts"]
+}

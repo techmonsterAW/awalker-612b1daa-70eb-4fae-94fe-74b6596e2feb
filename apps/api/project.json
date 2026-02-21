@@ -32,6 +32,14 @@
           "buildTarget": "api:build:production"
         }
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx jest --config=jest.api.config.js --passWithNoTests",
+        "cwd": "."
+      },
+      "configurations": {}
     }
   },
   "tags": ["scope:api"]

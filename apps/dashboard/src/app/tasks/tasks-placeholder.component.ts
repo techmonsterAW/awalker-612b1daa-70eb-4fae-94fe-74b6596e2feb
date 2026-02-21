@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -104,6 +104,7 @@ import { forkJoin } from 'rxjs';
           } @else {
             <ul
               cdkDropList
+              cdkDropListOrientation="vertical"
               [cdkDropListDisabled]="!canReorder()"
               (cdkDropListDropped)="onDrop($event)"
               class="space-y-3"
@@ -111,9 +112,10 @@ import { forkJoin } from 'rxjs';
               @for (task of displayedTasks(); track task.id) {
                 <li
                   cdkDrag
+                  (cdkDragEnded)="onDragEnd()"
                   class="rounded-xl border border-white/10 bg-base-card p-4 transition hover:border-white/15"
                 >
-                  <div class="flex items-start gap-3">
+                  <div class="task-card-content flex items-start gap-3">
                     @if (canReorder()) {
                       <div class="flex shrink-0 cursor-grab touch-none active:cursor-grabbing" cdkDragHandle>
                         <span class="text-slate-500">⋮⋮</span>
@@ -262,7 +264,8 @@ export class TasksPlaceholderComponent implements OnInit {
     private auth: AuthService,
     private router: Router,
     private taskService: TaskService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private cdr: ChangeDetectorRef
   ) {
     const user = this.auth.currentUser;
     this.currentEmail = user?.email ?? 'Signed in';
@@ -311,18 +314,30 @@ export class TasksPlaceholderComponent implements OnInit {
     if (!this.canReorder()) return;
     const list = this.displayedTasks().slice();
     moveItemInArray(list, event.previousIndex, event.currentIndex);
-    this.tasks.set(list);
+    list.forEach((task, i) => (task.order = i));
+    this.tasks.set([...list]);
     const update$ = list.map((task, i) => this.taskService.updateTask(task.id, { order: i }));
     forkJoin(update$).subscribe({
-      next: () => this.taskService.loadTasks().subscribe({ next: (tasks) => this.tasks.set(tasks) }),
+      next: () => {
+        // Keep current list; no refetch so CDK state and Edit/Delete on all panels stay valid
+      },
       error: (err) => (this.error = err?.error?.message ?? 'Failed to reorder'),
     });
+  }
+
+  /** Run after any drag ends so the view and pointer-events are refreshed and Edit/Delete work again. */
+  onDragEnd(): void {
+    setTimeout(() => this.cdr.detectChanges(), 0);
   }
 
   updateTaskStatus(task: Task, status: string): void {
     if (status === task.status || !Object.values(TaskStatus).includes(status as TaskStatus)) return;
     this.taskService.updateTask(task.id, { status: status as TaskStatus }).subscribe({
-      next: () => this.tasks.set(this.taskService.getTasks()),
+      next: (updated) => {
+        task.status = updated.status;
+        task.updatedAt = updated.updatedAt;
+        this.tasks.set([...this.tasks()]);
+      },
       error: (err) => (this.error = err?.error?.message ?? 'Failed to update status'),
     });
   }
@@ -374,8 +389,20 @@ export class TasksPlaceholderComponent implements OnInit {
     };
     if (this.editingTask) {
       this.taskService.updateTask(this.editingTask.id, dto).subscribe({
-        next: () => {
-          this.tasks.set(this.taskService.getTasks());
+        next: (updated) => {
+          // Update the edited task in place so we keep the same object references for other tasks (e.g. one that was just dragged) and don't break CDK drag state
+          const current = this.tasks();
+          const idx = current.findIndex((t) => t.id === updated.id);
+          if (idx !== -1) {
+            const t = current[idx];
+            t.title = updated.title;
+            t.description = updated.description ?? '';
+            t.status = updated.status;
+            t.category = updated.category;
+            t.updatedAt = updated.updatedAt;
+            if (updated.order !== undefined) t.order = updated.order;
+          }
+          this.tasks.set([...current]);
           this.saving = false;
           this.closeModal();
         },
@@ -386,8 +413,8 @@ export class TasksPlaceholderComponent implements OnInit {
       });
     } else {
       this.taskService.createTask(dto).subscribe({
-        next: () => {
-          this.tasks.set(this.taskService.getTasks());
+        next: (newTask) => {
+          this.tasks.set([...this.tasks(), newTask]);
           this.saving = false;
           this.closeModal();
         },
@@ -403,7 +430,7 @@ export class TasksPlaceholderComponent implements OnInit {
     if (!confirm(`Delete "${task.title}"?`)) return;
     this.taskService.deleteTask(task.id).subscribe({
       next: () => {
-        this.tasks.set(this.taskService.getTasks());
+        this.tasks.set(this.tasks().filter((t) => t.id !== task.id));
       },
       error: (err) => {
         this.error = err?.error?.message ?? 'Delete failed';
