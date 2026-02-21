@@ -5,6 +5,7 @@ import { Task as TaskEntity } from '../entities';
 import { Organization } from '../entities';
 import { User } from '../entities';
 import { Task, CreateTaskDto, UpdateTaskDto, TaskStatus, TaskCategory } from '@taskmgmt/data';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class TasksService {
@@ -12,7 +13,8 @@ export class TasksService {
     @InjectRepository(TaskEntity)
     private taskRepo: Repository<TaskEntity>,
     @InjectRepository(Organization)
-    private orgRepo: Repository<Organization>
+    private orgRepo: Repository<Organization>,
+    private audit: AuditService
   ) {}
 
   async getTasksForUser(user: User): Promise<Task[]> {
@@ -21,7 +23,7 @@ export class TasksService {
       where: { organizationId: In(orgIds) },
       order: { order: 'ASC', createdAt: 'ASC' },
     });
-    this.auditTaskListRequest(user);
+    await this.auditTaskListRequest(user);
     return entities.map((e) => this.toTaskDto(e));
   }
 
@@ -48,8 +50,8 @@ export class TasksService {
     };
   }
 
-  private auditTaskListRequest(user: User): void {
-    console.log(`[Audit] User ${user.email} (id: ${user.id}) requested task list`);
+  private async auditTaskListRequest(user: User): Promise<void> {
+    await this.audit.log(user.id, 'list', 'task', null, 'Task list requested');
   }
 
   async create(user: User, dto: CreateTaskDto): Promise<Task> {
@@ -69,7 +71,7 @@ export class TasksService {
       order,
     });
     await this.taskRepo.save(entity);
-    this.audit('create', user.id, entity.id);
+    await this.audit.log(user.id, 'create', 'task', entity.id, `Task created: ${entity.title}`);
     return this.toTaskDto(entity);
   }
 
@@ -84,7 +86,7 @@ export class TasksService {
     if (dto.category !== undefined) task.category = dto.category;
     if (dto.order !== undefined) task.order = dto.order;
     await this.taskRepo.save(task);
-    this.audit('update', user.id, task.id);
+    await this.audit.log(user.id, 'update', 'task', task.id, `Task updated: ${task.title}`);
     return this.toTaskDto(task);
   }
 
@@ -93,11 +95,7 @@ export class TasksService {
     if (!task) throw new NotFoundException('Task not found');
     const orgIds = await this.getOrganizationIdsForUser(user.organizationId);
     if (!orgIds.includes(task.organizationId)) throw new ForbiddenException('Task not in your organization');
+    await this.audit.log(user.id, 'delete', 'task', taskId, `Task deleted: ${task.title}`);
     await this.taskRepo.remove(task);
-    this.audit('delete', user.id, taskId);
-  }
-
-  private audit(action: string, userId: string, taskId: string): void {
-    console.log(`[Audit] User ${userId} ${action} task ${taskId} at ${new Date().toISOString()}`);
   }
 }

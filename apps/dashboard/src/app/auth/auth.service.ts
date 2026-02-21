@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
-import { LoginRequest, LoginResponse, UserView } from '@taskmgmt/data';
+import { LoginRequest, LoginResponse, UserView, Role } from '@taskmgmt/data';
 
 const TOKEN_KEY = 'task_token';
 const USER_KEY = 'task_user';
@@ -20,6 +20,11 @@ export class AuthService {
 
   get token(): string | null {
     return sessionStorage.getItem(TOKEN_KEY);
+  }
+
+  get canViewAudit(): boolean {
+    const role = this.currentUser?.role;
+    return role === Role.Admin || role === Role.Owner;
   }
 
   login(dto: LoginRequest): Observable<LoginResponse> {

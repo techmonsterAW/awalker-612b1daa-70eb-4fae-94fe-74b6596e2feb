@@ -6,13 +6,15 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../entities';
 import { LoginRequest, LoginResponse, UserView } from '@taskmgmt/data';
 import { Role } from '@taskmgmt/data';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private userRepo: Repository<User>,
-    private jwt: JwtService
+    private jwt: JwtService,
+    private audit: AuditService
   ) {}
 
   async login(dto: LoginRequest): Promise<LoginResponse> {
@@ -22,6 +24,7 @@ export class AuthService {
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    await this.audit.log(user.id, 'login', 'auth', user.id, `User ${user.email} logged in`);
     const payload = { sub: user.id, email: user.email, role: user.role, organizationId: user.organizationId };
     const accessToken = this.jwt.sign(payload);
     const userView: UserView = {

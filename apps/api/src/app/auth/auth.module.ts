@@ -6,11 +6,13 @@ import { User } from '../entities';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
+    AuditModule,
     JwtModule.register({
       secret: process.env['JWT_SECRET'] || 'dev-secret-change-in-production',
       signOptions: { expiresIn: process.env['JWT_EXPIRES_IN'] || '7d' },

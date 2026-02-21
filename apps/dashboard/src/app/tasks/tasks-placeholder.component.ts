@@ -5,11 +5,12 @@ import { Router } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { TaskService } from './task.service';
 import { Task, TaskStatus, TaskCategory, Role, CreateTaskDto } from '@taskmgmt/data';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-tasks-placeholder',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
     <div class="relative z-10 flex min-h-screen flex-col">
       <header class="flex items-center justify-between border-b border-white/10 bg-base-elevated px-6 py-4">
@@ -18,6 +19,14 @@ import { Task, TaskStatus, TaskCategory, Role, CreateTaskDto } from '@taskmgmt/d
           <span class="text-lg font-bold tracking-tight text-slate-100">Task Management</span>
         </div>
         <div class="flex items-center gap-4">
+          @if (canViewAudit) {
+            <a
+              routerLink="/audit"
+              class="rounded-lg px-3 py-1.5 text-sm text-slate-400 transition hover:bg-white/5 hover:text-slate-100"
+            >
+              Audit log
+            </a>
+          }
           <span class="rounded-lg bg-base-input px-3 py-1.5 text-sm text-slate-400">{{ currentEmail }}</span>
           <button
             type="button"
@@ -188,6 +197,10 @@ export class TasksPlaceholderComponent implements OnInit {
   get canManageTasks(): boolean {
     const role = this.auth.currentUser?.role;
     return role === Role.Admin || role === Role.Owner;
+  }
+
+  get canViewAudit(): boolean {
+    return this.auth.canViewAudit;
   }
 
   ngOnInit(): void {
