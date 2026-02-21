@@ -1,0 +1,38 @@
+{
+  "name": "api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/api/src",
+  "projectType": "application",
+  "implicitDependencies": ["data"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/api"],
+      "options": {
+        "commands": [
+          "nx run data:build",
+          "npx tsc -p tsconfig.json",
+          "node -e \"const fs=require('fs'),path=require('path');const r=path.resolve('../../dist');const src=path.join(r,'libs/data');const dest=path.join(r,'apps/api/node_modules/@taskmgmt/data');fs.mkdirSync(path.dirname(dest),{recursive:true});fs.cpSync(src,dest,{recursive:true});fs.writeFileSync(path.join(dest,'package.json'),JSON.stringify({name:'@taskmgmt/data',version:'0.0.0',main:'./src/index.js',types:'./src/index.d.ts'},null,2));const apiDist=path.join(path.resolve('../../dist'),'apps/api');fs.writeFileSync(path.join(apiDist,'package.json'),JSON.stringify({name:'api',version:'0.0.0',main:'run.js'},null,2));\""
+        ],
+        "cwd": "apps/api",
+        "parallel": false
+      },
+      "configurations": {
+        "production": {}
+      }
+    },
+    "serve": {
+      "executor": "@nx/node:node",
+      "options": {
+        "buildTarget": "api:build",
+        "port": 3333
+      },
+      "configurations": {
+        "production": {
+          "buildTarget": "api:build:production"
+        }
+      }
+    }
+  },
+  "tags": ["scope:api"]
+}

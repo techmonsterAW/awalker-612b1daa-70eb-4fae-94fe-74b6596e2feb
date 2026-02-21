@@ -1,0 +1,42 @@
+{
+  "name": "dashboard",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/dashboard/src",
+  "projectType": "application",
+  "implicitDependencies": ["data"],
+  "targets": {
+    "build": {
+      "executor": "@nx/angular:browser-esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/dashboard",
+        "index": "apps/dashboard/src/index.html",
+        "main": "apps/dashboard/src/main.ts",
+        "tsConfig": "apps/dashboard/tsconfig.app.json",
+        "polyfills": ["zone.js"],
+        "styles": ["apps/dashboard/src/styles.css"],
+        "assets": []
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "outputHashing": "all"
+        }
+      }
+    },
+    "serve": {
+      "executor": "@angular-devkit/build-angular:dev-server",
+      "options": {
+        "buildTarget": "dashboard:build",
+        "port": 4200,
+        "proxyConfig": "apps/dashboard/proxy.conf.json"
+      },
+      "configurations": {
+        "production": {
+          "buildTarget": "dashboard:build:production"
+        }
+      }
+    }
+  },
+  "tags": ["scope:dashboard"]
+}

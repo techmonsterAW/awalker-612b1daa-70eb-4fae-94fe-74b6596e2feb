@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@taskmgmt/data": ["libs/data/src/index.ts"],
+      "@taskmgmt/data/*": ["libs/data/src/*"],
+      "@taskmgmt/auth": ["libs/auth/src/index.ts"],
+      "@taskmgmt/auth/*": ["libs/auth/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist"]
+}

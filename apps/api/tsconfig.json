@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "outDir": "../../dist/apps/api",
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": false,
+    "paths": {
+      "@taskmgmt/data": ["../../dist/libs/data/src/index"],
+      "@taskmgmt/data/*": ["../../dist/libs/data/src/*"],
+      "@taskmgmt/auth": ["../../libs/auth/src/index.ts"],
+      "@taskmgmt/auth/*": ["../../libs/auth/src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

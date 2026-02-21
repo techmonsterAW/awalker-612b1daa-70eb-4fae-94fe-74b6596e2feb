@@ -1,0 +1,22 @@
+{
+  "name": "data",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/data/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/data",
+        "tsConfig": "libs/data/tsconfig.json",
+        "packageJson": "libs/data/package.json",
+        "main": "libs/data/src/index.ts"
+      },
+      "configurations": {
+        "production": {}
+      }
+    }
+  },
+  "tags": ["scope:shared"]
+}
