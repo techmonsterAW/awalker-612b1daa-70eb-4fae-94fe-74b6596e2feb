@@ -1,24 +1,25 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { TaskService } from './task.service';
-import { Task, TaskStatus, TaskCategory, Role, CreateTaskDto } from '@taskmgmt/data';
-import { RouterLink } from '@angular/router';
+import { Task, TaskStatus, TaskCategory, Role, CreateTaskDto, UpdateTaskDto } from '@taskmgmt/data';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-tasks-placeholder',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink, DragDropModule],
   template: `
     <div class="relative z-10 flex min-h-screen flex-col">
-      <header class="flex items-center justify-between border-b border-white/10 bg-base-elevated px-6 py-4">
+      <header class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-base-elevated px-4 py-3 sm:px-6 sm:py-4">
         <div class="flex items-center gap-3">
-          <div class="h-9 w-9 rounded-lg bg-gradient-to-br from-accent to-emerald-500 shadow-lg shadow-emerald-500/30"></div>
+          <div class="h-9 w-9 shrink-0 rounded-lg bg-gradient-to-br from-accent to-emerald-500 shadow-lg shadow-emerald-500/30"></div>
           <span class="text-lg font-bold tracking-tight text-slate-100">Task Management</span>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-4">
           @if (canViewAudit) {
             <a
               routerLink="/audit"
@@ -37,14 +38,14 @@ import { RouterLink } from '@angular/router';
           </button>
         </div>
       </header>
-      <main class="flex-1 p-6">
+      <main class="flex-1 p-4 sm:p-6">
         <div class="mx-auto max-w-3xl">
-          <div class="mb-4 flex items-center justify-between">
+          <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 class="text-xl font-bold tracking-tight text-slate-100">Tasks</h2>
             @if (canManageTasks) {
               <button
                 type="button"
-                class="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-slate-900 transition hover:opacity-90"
+                class="w-full rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-slate-900 transition hover:opacity-90 sm:w-auto"
                 (click)="openCreate()"
               >
                 Add task
@@ -52,30 +53,91 @@ import { RouterLink } from '@angular/router';
             }
           </div>
 
+          <div class="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-base-card p-3">
+            <span class="text-xs font-medium text-slate-500 sm:text-sm">Sort:</span>
+            <select
+              [ngModel]="sortBy()"
+              (ngModelChange)="sortBy.set($event)"
+              class="rounded-lg border border-white/10 bg-base-input px-3 py-1.5 text-sm text-slate-200 focus:border-accent focus:outline-none"
+            >
+              <option value="default">Default order</option>
+              <option value="dateDesc">Date (newest)</option>
+              <option value="dateAsc">Date (oldest)</option>
+              <option value="status">Status</option>
+              <option value="titleAsc">Title (A–Z)</option>
+              <option value="titleDesc">Title (Z–A)</option>
+            </select>
+            <span class="ml-2 text-xs font-medium text-slate-500 sm:ml-0 sm:text-sm">Filter:</span>
+            <select
+              [ngModel]="filterStatus()"
+              (ngModelChange)="filterStatus.set($event)"
+              class="rounded-lg border border-white/10 bg-base-input px-3 py-1.5 text-sm text-slate-200 focus:border-accent focus:outline-none"
+            >
+              <option value="">All statuses</option>
+              <option [value]="TaskStatus.Todo">To do</option>
+              <option [value]="TaskStatus.InProgress">In progress</option>
+              <option [value]="TaskStatus.Done">Done</option>
+            </select>
+            <select
+              [ngModel]="filterCategory()"
+              (ngModelChange)="filterCategory.set($event)"
+              class="rounded-lg border border-white/10 bg-base-input px-3 py-1.5 text-sm text-slate-200 focus:border-accent focus:outline-none"
+            >
+              <option value="">All categories</option>
+              <option [value]="TaskCategory.Work">Work</option>
+              <option [value]="TaskCategory.Personal">Personal</option>
+            </select>
+          </div>
+
           @if (loading) {
-            <div class="flex items-center justify-center py-12">
+            <div class="flex justify-center py-12">
               <span class="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-accent"></span>
             </div>
           } @else if (error) {
             <div class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
               {{ error }}
             </div>
-          } @else if (tasks.length === 0) {
+          } @else if (displayedTasks().length === 0) {
             <p class="rounded-xl border border-white/10 bg-base-card p-6 text-center text-slate-400">
-              No tasks yet. Tasks you create will appear here.
+              {{ tasks().length === 0 ? 'No tasks yet. Tasks you create will appear here.' : 'No tasks match the current filters.' }}
             </p>
           } @else {
-            <ul class="space-y-3">
-              @for (task of tasks; track task.id) {
-                <li class="rounded-xl border border-white/10 bg-base-card p-4 transition hover:border-white/15">
-                  <div class="flex items-start justify-between gap-3">
+            <ul
+              cdkDropList
+              [cdkDropListDisabled]="!canReorder()"
+              (cdkDropListDropped)="onDrop($event)"
+              class="space-y-3"
+            >
+              @for (task of displayedTasks(); track task.id) {
+                <li
+                  cdkDrag
+                  class="rounded-xl border border-white/10 bg-base-card p-4 transition hover:border-white/15"
+                >
+                  <div class="flex items-start gap-3">
+                    @if (canReorder()) {
+                      <div class="flex shrink-0 cursor-grab touch-none active:cursor-grabbing" cdkDragHandle>
+                        <span class="text-slate-500">⋮⋮</span>
+                      </div>
+                    }
                     <div class="min-w-0 flex-1">
                       <h3 class="font-semibold text-slate-100">{{ task.title }}</h3>
                       @if (task.description) {
                         <p class="mt-1 text-sm text-slate-400 line-clamp-2">{{ task.description }}</p>
                       }
                       <div class="mt-2 flex flex-wrap items-center gap-2">
-                        <span [class]="statusClass(task.status)">{{ formatStatus(task.status) }}</span>
+                        @if (canManageTasks) {
+                          <select
+                            [value]="task.status"
+                            (change)="updateTaskStatus(task, $any($event.target).value)"
+                            class="rounded border border-white/10 bg-base-input px-2 py-0.5 text-xs text-slate-300 focus:border-accent focus:outline-none"
+                          >
+                            <option [value]="TaskStatus.Todo">To do</option>
+                            <option [value]="TaskStatus.InProgress">In progress</option>
+                            <option [value]="TaskStatus.Done">Done</option>
+                          </select>
+                        } @else {
+                          <span [class]="statusClass(task.status)">{{ formatStatus(task.status) }}</span>
+                        }
                         <span class="rounded bg-base-input px-2 py-0.5 text-xs text-slate-400">{{ formatCategory(task.category) }}</span>
                         @if (canManageTasks) {
                           <button
@@ -104,8 +166,8 @@ import { RouterLink } from '@angular/router';
       </main>
 
       @if (showModal) {
-        <div class="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4" (click)="closeModal()">
-          <div class="w-full max-w-md rounded-2xl border border-white/10 bg-base-card p-6 shadow-xl" (click)="$event.stopPropagation()">
+        <div class="fixed inset-0 z-20 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" (click)="closeModal()">
+          <div class="w-full max-h-[90vh] overflow-y-auto rounded-t-2xl border border-white/10 bg-base-card p-6 shadow-xl sm:max-w-md sm:rounded-2xl sm:max-h-none" (click)="$event.stopPropagation()">
             <h3 class="mb-4 text-lg font-semibold text-slate-100">{{ editingTask ? 'Edit task' : 'New task' }}</h3>
             <form [formGroup]="taskForm" (ngSubmit)="saveTask()">
               <div class="space-y-4">
@@ -167,7 +229,7 @@ import { RouterLink } from '@angular/router';
   `,
 })
 export class TasksPlaceholderComponent implements OnInit {
-  tasks: Task[] = [];
+  tasks = signal<Task[]>([]);
   loading = true;
   error = '';
   currentEmail = '';
@@ -176,6 +238,18 @@ export class TasksPlaceholderComponent implements OnInit {
   saving = false;
   TaskStatus = TaskStatus;
   TaskCategory = TaskCategory;
+
+  sortBy = signal<string>('default');
+  filterStatus = signal<string>('');
+  filterCategory = signal<string>('');
+
+  displayedTasks = computed(() => {
+    const t = this.tasks();
+    const s = this.sortBy();
+    const fs = this.filterStatus();
+    const fc = this.filterCategory();
+    return this.applyFilterSort(t, s, fs, fc);
+  });
 
   taskForm = this.fb.nonNullable.group({
     title: ['', Validators.required],
@@ -203,10 +277,60 @@ export class TasksPlaceholderComponent implements OnInit {
     return this.auth.canViewAudit;
   }
 
+  canReorder(): boolean {
+    return this.canManageTasks && this.sortBy() === 'default' && !this.filterStatus() && !this.filterCategory();
+  }
+
+  private applyFilterSort(tasks: Task[], sortBy: string, filterStatus: string, filterCategory: string): Task[] {
+    let out = tasks.slice();
+    if (filterStatus) out = out.filter((t) => t.status === filterStatus);
+    if (filterCategory) out = out.filter((t) => t.category === filterCategory);
+    switch (sortBy) {
+      case 'dateDesc':
+        out.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+      case 'dateAsc':
+        out.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        break;
+      case 'status':
+        out.sort((a, b) => a.status.localeCompare(b.status));
+        break;
+      case 'titleAsc':
+        out.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case 'titleDesc':
+        out.sort((a, b) => b.title.localeCompare(a.title));
+        break;
+      default:
+        out.sort((a, b) => a.order - b.order || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    }
+    return out;
+  }
+
+  onDrop(event: CdkDragDrop<Task[]>): void {
+    if (!this.canReorder()) return;
+    const list = this.displayedTasks().slice();
+    moveItemInArray(list, event.previousIndex, event.currentIndex);
+    this.tasks.set(list);
+    const update$ = list.map((task, i) => this.taskService.updateTask(task.id, { order: i }));
+    forkJoin(update$).subscribe({
+      next: () => this.taskService.loadTasks().subscribe({ next: (tasks) => this.tasks.set(tasks) }),
+      error: (err) => (this.error = err?.error?.message ?? 'Failed to reorder'),
+    });
+  }
+
+  updateTaskStatus(task: Task, status: string): void {
+    if (status === task.status || !Object.values(TaskStatus).includes(status as TaskStatus)) return;
+    this.taskService.updateTask(task.id, { status: status as TaskStatus }).subscribe({
+      next: () => this.tasks.set(this.taskService.getTasks()),
+      error: (err) => (this.error = err?.error?.message ?? 'Failed to update status'),
+    });
+  }
+
   ngOnInit(): void {
     this.taskService.loadTasks().subscribe({
       next: (list) => {
-        this.tasks = list;
+        this.tasks.set(list);
         this.loading = false;
       },
       error: (err) => {
@@ -251,7 +375,7 @@ export class TasksPlaceholderComponent implements OnInit {
     if (this.editingTask) {
       this.taskService.updateTask(this.editingTask.id, dto).subscribe({
         next: () => {
-          this.tasks = this.taskService.getTasks();
+          this.tasks.set(this.taskService.getTasks());
           this.saving = false;
           this.closeModal();
         },
@@ -263,7 +387,7 @@ export class TasksPlaceholderComponent implements OnInit {
     } else {
       this.taskService.createTask(dto).subscribe({
         next: () => {
-          this.tasks = this.taskService.getTasks();
+          this.tasks.set(this.taskService.getTasks());
           this.saving = false;
           this.closeModal();
         },
@@ -279,7 +403,7 @@ export class TasksPlaceholderComponent implements OnInit {
     if (!confirm(`Delete "${task.title}"?`)) return;
     this.taskService.deleteTask(task.id).subscribe({
       next: () => {
-        this.tasks = this.taskService.getTasks();
+        this.tasks.set(this.taskService.getTasks());
       },
       error: (err) => {
         this.error = err?.error?.message ?? 'Delete failed';
