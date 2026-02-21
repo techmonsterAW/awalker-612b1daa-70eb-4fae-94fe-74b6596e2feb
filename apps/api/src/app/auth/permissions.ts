@@ -1,3 +1,7 @@
+/**
+ * Inlined from @taskmgmt/auth so the API build does not depend on the auth lib output.
+ * Keep in sync with libs/auth/src/lib/permissions.ts.
+ */
 export const PERMISSIONS = {
   TASK_READ: 'task:read',
   TASK_CREATE: 'task:create',

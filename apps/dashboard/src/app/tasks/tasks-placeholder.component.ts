@@ -1,6 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
+import { TaskService } from './task.service';
+import { Task, TaskStatus, TaskCategory } from '@taskmgmt/data';
 
 @Component({
   selector: 'app-tasks-placeholder',
@@ -23,33 +25,102 @@ import { AuthService } from '../auth/auth.service';
           </button>
         </div>
       </header>
-      <main class="flex flex-1 items-center justify-center p-6">
-        <div class="max-w-[420px] rounded-2xl border border-white/10 bg-base-card p-8 text-center shadow-xl">
-          <div class="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-xl bg-accent-dim text-accent">
-            <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 11l3 3L22 4"/>
-              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-            </svg>
-          </div>
-          <h2 class="mb-3 text-2xl font-bold tracking-tight text-slate-100">You're all set</h2>
-          <p class="mb-6 text-slate-400 leading-relaxed">
-            You're signed in. The task list and full workspace will be available in the next step.
-          </p>
-          <div class="inline-flex items-center gap-2 rounded-full bg-accent-dim px-4 py-2 text-sm font-medium text-accent">
-            <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-accent"></span>
-            Ready for tasks
-          </div>
+      <main class="flex-1 p-6">
+        <div class="mx-auto max-w-3xl">
+          <h2 class="mb-4 text-xl font-bold tracking-tight text-slate-100">Tasks</h2>
+
+          @if (loading) {
+            <div class="flex items-center justify-center py-12">
+              <span class="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-accent"></span>
+            </div>
+          } @else if (error) {
+            <div class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              {{ error }}
+            </div>
+          } @else if (tasks.length === 0) {
+            <p class="rounded-xl border border-white/10 bg-base-card p-6 text-center text-slate-400">
+              No tasks yet. Tasks you create will appear here.
+            </p>
+          } @else {
+            <ul class="space-y-3">
+              @for (task of tasks; track task.id) {
+                <li class="rounded-xl border border-white/10 bg-base-card p-4 transition hover:border-white/15">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0 flex-1">
+                      <h3 class="font-semibold text-slate-100">{{ task.title }}</h3>
+                      @if (task.description) {
+                        <p class="mt-1 text-sm text-slate-400 line-clamp-2">{{ task.description }}</p>
+                      }
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        <span [class]="statusClass(task.status)">{{ formatStatus(task.status) }}</span>
+                        <span class="rounded bg-base-input px-2 py-0.5 text-xs text-slate-400">{{ formatCategory(task.category) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
         </div>
       </main>
     </div>
   `,
 })
-export class TasksPlaceholderComponent {
+export class TasksPlaceholderComponent implements OnInit {
+  tasks: Task[] = [];
+  loading = true;
+  error = '';
   currentEmail = '';
 
-  constructor(private auth: AuthService, private router: Router) {
+  constructor(
+    private auth: AuthService,
+    private router: Router,
+    private taskService: TaskService
+  ) {
     const user = this.auth.currentUser;
     this.currentEmail = user?.email ?? 'Signed in';
+  }
+
+  ngOnInit(): void {
+    this.taskService.loadTasks().subscribe({
+      next: (list) => {
+        this.tasks = list;
+        this.loading = false;
+      },
+      error: (err) => {
+        this.error = err?.error?.message ?? 'Failed to load tasks';
+        this.loading = false;
+      },
+    });
+  }
+
+  formatStatus(s: TaskStatus): string {
+    const map: Record<string, string> = {
+      [TaskStatus.Todo]: 'To do',
+      [TaskStatus.InProgress]: 'In progress',
+      [TaskStatus.Done]: 'Done',
+    };
+    return map[s] ?? s;
+  }
+
+  formatCategory(c: TaskCategory): string {
+    const map: Record<string, string> = {
+      [TaskCategory.Work]: 'Work',
+      [TaskCategory.Personal]: 'Personal',
+    };
+    return map[c] ?? c;
+  }
+
+  statusClass(s: TaskStatus): string {
+    const base = 'rounded px-2 py-0.5 text-xs font-medium ';
+    switch (s) {
+      case TaskStatus.Done:
+        return base + 'bg-emerald-500/20 text-emerald-400';
+      case TaskStatus.InProgress:
+        return base + 'bg-amber-500/20 text-amber-400';
+      default:
+        return base + 'bg-slate-500/20 text-slate-400';
+    }
   }
 
   logout(): void {

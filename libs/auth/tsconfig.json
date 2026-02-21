@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "commonjs",
-    "outDir": "./dist",
+    "outDir": "../../dist/libs/auth",
     "rootDir": "./src"
   },
   "include": ["src/**/*"],

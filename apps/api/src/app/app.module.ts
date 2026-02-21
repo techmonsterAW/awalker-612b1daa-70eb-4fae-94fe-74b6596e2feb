@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
-import { Organization, User } from './entities';
+import { Organization, User, Task } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { SeedModule } from './seed/seed.module';
+import { TasksModule } from './tasks/tasks.module';
 import { JwtAuthGuard } from './auth/auth.guard';
 
 function getTypeOrmOptions() {
@@ -12,7 +13,7 @@ function getTypeOrmOptions() {
     return {
       type: 'postgres' as const,
       url: 'postgresql://localhost:5432/taskdb',
-      entities: [Organization, User],
+      entities: [Organization, User, Task],
       synchronize: process.env['NODE_ENV'] !== 'production',
       logging: process.env['NODE_ENV'] === 'development',
     };
@@ -27,7 +28,7 @@ function getTypeOrmOptions() {
       username: decodeURIComponent(u.username),
       password: decodeURIComponent(u.password || ''),
       database: u.pathname.slice(1) || 'taskdb',
-      entities: [Organization, User],
+      entities: [Organization, User, Task],
       synchronize: process.env['NODE_ENV'] !== 'production',
       logging: process.env['NODE_ENV'] === 'development',
     };
@@ -35,7 +36,7 @@ function getTypeOrmOptions() {
     return {
       type: 'postgres' as const,
       url,
-      entities: [Organization, User],
+      entities: [Organization, User, Task],
       synchronize: process.env['NODE_ENV'] !== 'production',
       logging: process.env['NODE_ENV'] === 'development',
     };
@@ -47,6 +48,7 @@ function getTypeOrmOptions() {
     TypeOrmModule.forRoot(getTypeOrmOptions()),
     AuthModule,
     SeedModule,
+    TasksModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

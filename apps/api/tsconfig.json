@@ -11,11 +11,9 @@
     "noImplicitAny": false,
     "paths": {
       "@taskmgmt/data": ["../../dist/libs/data/src/index"],
-      "@taskmgmt/data/*": ["../../dist/libs/data/src/*"],
-      "@taskmgmt/auth": ["../../libs/auth/src/index.ts"],
-      "@taskmgmt/auth/*": ["../../libs/auth/src/*"]
+      "@taskmgmt/data/*": ["../../dist/libs/data/src/*"]
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules"]
 }
